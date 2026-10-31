@@ -1,0 +1,239 @@
+Metadata-Version: 2.4
+Name: liquid-types
+Version: 0.1.0
+Summary: Implementation of Liquid Types (Refinement Types) over Hindley-Milner type inference in Python
+Author-email: Rajarshi <rajarshi@example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/yourusername/liquid-types
+Project-URL: Repository, https://github.com/yourusername/liquid-types
+Project-URL: Issues, https://github.com/yourusername/liquid-types/issues
+Keywords: liquid-types,refinement-types,type-inference,hindley-milner,smt,z3,static-analysis,program-verification
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Topic :: Scientific/Engineering :: Mathematics
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: z3-solver>=4.12.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: mypy>=1.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=7.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=1.3; extra == "docs"
+
+# Liquid Types
+
+An implementation of **Liquid Types (Logically Qualified Types)** over the **Hindley-Milner** type inference algorithm in Python.
+
+Liquid Types extend traditional type systems with **refinement types** - types decorated with logical predicates that constrain the set of values a variable can take. This enables lightweight formal verification of program properties like bounds checking, null safety, and arithmetic invariants.
+
+## Features
+
+- **Hindley-Milner Type Inference** with full polymorphism (let-polymorphism)
+- **Refinement Types** with predicates expressed in decidable logic
+- **Path-Sensitive Analysis** using SMT solver (Z3)
+- **Qualifier-Based Predicate Synthesis** - automatically discovers strongest invariants
+- **Fixed-Point Constraint Solving** for refinement predicate inference
+
+## Quick Start
+
+### Installation
+
+```bash
+pip install z3-solver
+# Or install from source:
+pip install -e .
+```
+
+### Basic Usage
+
+```python
+from liquid import (
+    Int, Bool, Var, Lambda, App, Let, BinOp, IfExpr,
+    type_check_liquid, ComparisonPred
+)
+
+# Define qualifier templates (the "shapes" of predicates to discover)
+qualifiers = [
+    ComparisonPred(">=", "ν", "*"),  # ν >= variable/constant
+    ComparisonPred("==", "ν", "*"),  # ν == variable/constant
+    ComparisonPred("<=", "ν", "*"),  # ν <= variable/constant
+]
+
+# Type check expressions
+expr = Let('x', Int(10), BinOp('+', Var('x'), Int(5)))
+result_type = type_check_liquid(expr, qualifiers)
+print(result_type)
+# Output: { int | ν >= x AND ν >= 0 AND ν == 15 }
+```
+
+### Running Examples
+
+```bash
+# Run built-in demonstration
+python -m liquid
+
+# Run comprehensive examples
+python examples/basic_examples.py
+```
+
+## Architecture
+
+### Core Components
+
+```
+liquid/
+├── types.py         # HM types: TVar, TFun, TScheme, RefinedType, Int, Bool
+├── predicates.py    # Refinement predicates: TruePred, ComparisonPred, AndPred, NotPred
+├── expressions.py   # AST: Var, Lambda, App, Let, BinOp, IfExpr
+├── constraints.py   # Constraint generation & solving with Z3
+├── inference.py     # Main type inference algorithm
+└── __main__.py      # CLI entry point
+```
+
+### Type Language
+
+```
+Base Types:     int, bool
+Type Variables: 'a, 'b, ...
+Function Types: τ₁ → τ₂
+Type Schemes:   ∀α₁...αₙ. τ
+Refined Types:  { τ | φ }        // τ is base type, φ is predicate
+```
+
+### Predicate Language
+
+```
+φ ::= true
+    | e₁ op e₂              // Comparison: >, <, >=, <=, ==, !=
+    | φ₁ AND φ₂             // Conjunction
+    | NOT φ                 // Negation
+    | κ                     // Placeholder (solved by constraint solver)
+```
+
+Where expressions `e` can be:
+- `ν` (the value being refined)
+- Program variables in scope
+- Constants (e.g., `0`, `true`)
+
+## How It Works
+
+### 1. Type Inference with Placeholders
+The algorithm first performs standard Hindley-Milner inference, but wraps every type in a `RefinedType` with a **predicate placeholder** (`κ`) representing an unknown refinement.
+
+### 2. Constraint Generation
+During inference, a `ConstraintGenerator` collects constraints of the form:
+```
+(path_condition, κ, expression_value)
+```
+Meaning: "under `path_condition`, the value of this expression is `expression_value`, so `κ` must hold for this value."
+
+### 3. Qualifier Instantiation
+Given qualifier templates (e.g., `ν >= *`), the solver instantiates them with all program variables and constants to create a finite set of candidate predicates.
+
+### 4. Fixed-Point Solving
+For each `κ`, the solver finds the **strongest conjunction** of qualifiers that is implied by **ALL** constraints for that `κ`. This repeats until a fixed point is reached.
+
+## Example: max(x, y)
+
+```python
+# Expression: λx. λy. if x > y then x else y
+max_expr = Lambda('x', Lambda('y', 
+    IfExpr(BinOp('>', Var('x'), Var('y')), Var('x'), Var('y'))
+))
+
+# Result type:
+# (int -> (int -> { int | ν >= x AND ν >= y }))
+```
+
+The solver discovers that the return value `ν` must be ≥ both `x` and `y` by analyzing both branches of the `if` expression under their respective path conditions.
+
+## Theory Background
+
+This implementation is based on:
+
+1. **Liquid Types** - Rondon, Kawaguchi, Jhala (PLDI 2008)
+2. **Hindley-Milner Type Inference** - Damas & Milner (1982)
+3. **Refinement Types** - Freeman & Pfenning (1991)
+
+Key insight: By restricting predicates to a decidable fragment (quantifier-free linear arithmetic) and using a finite set of qualifier templates, type checking becomes decidable and automated via SMT solving.
+
+## Testing
+
+```bash
+# Run all tests
+pytest tests/
+
+# Run with coverage
+pytest --cov=liquid tests/
+```
+
+## Project Structure
+
+```
+liquid-types/
+├── liquid/              # Main package
+│   ├── __init__.py
+│   ├── types.py
+│   ├── predicates.py
+│   ├── expressions.py
+│   ├── constraints.py
+│   ├── inference.py
+│   └── __main__.py
+├── tests/
+│   └── test_liquid_types.py
+├── examples/
+│   └── basic_examples.py
+├── pyproject.toml
+└── README.md
+```
+
+## Extending the System
+
+### Adding New Qualifiers
+
+```python
+# Add custom qualifier templates
+custom_qualifiers = [
+    ComparisonPred(">=", "ν", "0"),      # Non-negative
+    ComparisonPred("<", "ν", "len"),     # Array bounds
+    ComparisonPred("==", "ν", "x + y"),  # Arithmetic relationships
+]
+```
+
+### Adding New Expression Types
+
+1. Add AST node in `expressions.py`
+2. Handle in `ConstraintGenerator.generate()`
+3. Handle in `infer()` in `inference.py`
+
+## Limitations & Future Work
+
+- [ ] Support for algebraic data types (sum types, records)
+- [ ] Dependent function types (refinement on function arguments)
+- [ ] Measure functions for recursive data structures
+- [ ] Integration with Python's typing module (`typing.Annotated`)
+- [ ] More sophisticated qualifier synthesis (abduction)
+- [ ] Error messages with source locations
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## References
+
+- [Liquid Types (PLDI 2008)](https://dl.acm.org/doi/10.1145/1375581.1375602)
+- [Hindley-Milner Type Inference](https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system)
+- [Z3 Theorem Prover](https://github.com/Z3Prover/z3)
