@@ -1,6 +1,6 @@
-# Liquid Types
+# Implementation of the Liquid Types system in Pythin
 
-> **Lightweight formal verification for Python** — automatically discover invariants like "this variable is always non-negative" or "this index is within array bounds" without writing proofs.
+> **Lightweight formal verification** — automatically discover invariants like "this variable is always non-negative" or "this index is within array bounds" without writing proofs.
 
 ---
 
