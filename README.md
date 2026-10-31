@@ -7,6 +7,7 @@
 ## What is this?
 
 **Liquid Types** (Logically Qualified Types) extend regular type systems with **refinement types**. Instead of just saying "this is an `int`", you can say "this is an `{int | ν >= 0}`" — an integer that's guaranteed to be non-negative.
+This is an implementation of the Liquid Types paper and targets a simplified version of the Lambda Calculus
 
 The magic? You don't write the predicates yourself. The system **infers them automatically** using an SMT solver (Z3).
 
@@ -64,7 +65,7 @@ python -m liquid
 
 ---
 
-## How it works (in plain English)
+## How it works
 
 ### 1. Regular type inference first
 We run standard Hindley-Milner (like ML/Haskell) to get base types: `int`, `bool`, `a -> b`, etc.
@@ -172,7 +173,6 @@ Key insight: restrict predicates to **quantifier-free linear arithmetic** + **fi
 - [ ] Algebraic data types (enums, records)
 - [ ] Dependent function types (refinements on arguments)
 - [ ] Recursive data structures with measures
-- [ ] Python `typing.Annotated` integration
 - [ ] Better error messages with source locations
 - [ ] Abduction-based qualifier synthesis
 
