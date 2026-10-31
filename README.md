@@ -24,7 +24,7 @@ let x = 10 in x + 5
 ## Why should you care?
 
 | Regular Types | Liquid Types |
-|---------------|--------------|
+|---------------|-----------------------------------------------------------|
 | `int` | `{ int | 0 ≤ ν < len }` — **array index in bounds** |
 | `int` | `{ int | ν > 0 }` — **strictly positive** (no division by zero!) |
 | `List a` | `{ List a | len ≥ 1 }` — **non-empty list** (safe `head`) |
